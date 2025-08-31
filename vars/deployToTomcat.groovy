@@ -1,19 +1,18 @@
-def call(String credentialsId, String tomcatUrl, String contextPath = 'hello') {
-    stage('Deploy to Tomcat') {
-        script {
-            def warFile = sh(script: "ls target/*.war | head -n 1", returnStdout: true).trim()
-            echo "Deploying WAR file: ${warFile}"
+def call(Map config) {
+    // Ensure required arguments exist
+    if (!config.credentialsId || !config.tomcatUrl || !config.warFile || !config.contextPath) {
+        error "Missing required arguments: credentialsId, tomcatUrl, warFile, contextPath"
+    }
 
-            deploy adapters: [
-                tomcat9(
-                    alternativeDeploymentContext: '',
-                    credentialsId: credentialsId,
-                    path: '',
-                    url: tomcatUrl
-                )
-            ],
-            contextPath: contextPath,
-            war: warFile
-        }
+    withCredentials([usernamePassword(
+        credentialsId: config.credentialsId,
+        usernameVariable: 'TOMCAT_USER',
+        passwordVariable: 'TOMCAT_PASS'
+    )]) {
+        sh """
+            curl --fail -u $TOMCAT_USER:$TOMCAT_PASS \
+                --upload-file ${config.warFile} \
+                "${config.tomcatUrl}/manager/text/deploy?path=/${config.contextPath}&update=true"
+        """
     }
 }
